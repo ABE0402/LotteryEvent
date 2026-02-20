@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>당첨자 발표 - 모바일팩토리</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .result-box {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .win {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .lose {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="event-banner" style="background: linear-gradient(135deg, #28a745, #20c997);">
+            당첨자 발표
+        </div>
+
+        <h1>행운의 주인공을 확인하세요!</h1>
+        <p>참여하셨던 휴대폰 번호를 입력해주세요.</p>
+
+        <form id="checkForm">
+            <div class="form-group">
+                <label for="phone">휴대폰 번호</label>
+                <input type="tel" id="phone" placeholder="010-1234-5678" pattern="[0-9]{3}-[0-9]{4}-[0-9]{4}" required>
+            </div>
+
+            <button type="submit" class="btn-submit" style="background-color: #28a745;">결과 확인하기</button>
+        </form>
+
+        <div id="resultArea" class="result-box"></div>
+
+        <div style="margin-top: 20px;">
+            <a href="event.html" style="color: #666; text-decoration: none;">&larr; 이벤트 페이지로 돌아가기</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('checkForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const phone = document.getElementById('phone').value;
+            const resultArea = document.getElementById('resultArea');
+
+            // Clear previous
+            resultArea.style.display = 'none';
+            resultArea.className = 'result-box';
+
+            // Call Backend API
+            fetch(`/api/event/check?phone=${phone}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'win') {
+                        resultArea.innerHTML = `축하합니다!<br>${data.rank}등에 당첨되셨습니다!<br>${data.message}`;
+                        resultArea.classList.add('win');
+                    } else {
+                        resultArea.innerHTML = data.message;
+                        resultArea.classList.add('lose');
+                    }
+                    resultArea.style.display = 'block';
+                })
+                .catch(err => {
+                    resultArea.innerHTML = "확인 중 오류가 발생했습니다.";
+                    resultArea.classList.add('lose');
+                    resultArea.style.display = 'block';
+                });
+        });
+    </script>
+
+</body>
+
+</html>

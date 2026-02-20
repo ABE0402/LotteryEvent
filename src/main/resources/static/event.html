@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모바일팩토리 2025 해피 로또 이벤트</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="event-banner">
+            2025 HAPPY LOTTO
+        </div>
+
+        <h1>1등 경품의 주인공이 되세요!</h1>
+        <p>총 1,000분께 행운을 드립니다.</p>
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 2rem;">기간: 2025.02.01 ~ 03.31</p>
+
+        <form id="eventForm">
+            <div class="form-group">
+                <label for="name">이름</label>
+                <input type="text" id="name" placeholder="홍길동" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">휴대폰 번호</label>
+                <input type="tel" id="phone" placeholder="010-1234-5678" pattern="[0-9]{3}-[0-9]{4}-[0-9]{4}" required>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" required> 개인정보 수집 및 이용 동의
+                </label>
+            </div>
+
+            <button type="submit" class="btn-submit">이벤트 참여하기</button>
+        </form>
+
+        <div class="info-text">
+            * 본 이벤트는 1인 1회 참여 가능합니다.<br>
+            * 당첨자 발표는 2025년 4월 1일입니다.<br>
+            <a href="result.html" style="color: #333; font-weight: bold; text-decoration: underline;">[당첨 확인하기]</a>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">알림</h2>
+            <p id="modalMessage">성공적으로 응모되었습니다.<br>4월 1일에 결과를 확인하세요!</p>
+        </div>
+    </div>
+
+    <script>
+        // Get the modal
+        var modal = document.getElementById("resultModal");
+        var span = document.getElementsByClassName("close")[0];
+        var modalTitle = document.getElementById("modalTitle");
+        var modalMessage = document.getElementById("modalMessage");
+
+        document.getElementById('eventForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+
+            // Call Backend API
+            fetch('/api/event/participate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: name, phone: phone }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    modalTitle.innerText = "안내";
+                    modalMessage.innerText = data.message;
+                    modal.style.display = "block";
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    modalTitle.innerText = "오류";
+                    modalMessage.innerText = "서버 통신 중 오류가 발생했습니다.";
+                    modal.style.display = "block";
+                });
+        });
+
+        span.onclick = function () {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+
+</body>
+
+</html>

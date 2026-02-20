@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Factory</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Background & Overlay */
+        .hero {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: url('https://images.unsplash.com/photo-1550299238-30113dd8880a?q=80&w=2070&auto=format&fit=crop') no-repeat center center/cover;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 10%;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            /* Dark overlay */
+        }
+
+        /* Header */
+        header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 2rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            /* Orange point color could be added */
+        }
+
+        .logo span {
+            color: #f39c12;
+        }
+
+        .nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #fff;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        .nav a:hover {
+            opacity: 1;
+        }
+
+        .menu-icon {
+            font-size: 1.5rem;
+            cursor: pointer;
+            border: 1px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Hero Content */
+        .hero-content {
+            position: relative;
+            z-index: 5;
+            max-width: 600px;
+        }
+
+        .hero-content h1 {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero-content p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.9;
+            margin-bottom: 3rem;
+        }
+
+        .btn-more {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.8rem 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50px;
+            color: #fff;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-more:hover {
+            background: #fff;
+            color: #000;
+        }
+
+        /* Modal Popup */
+        .modal-overlay {
+            display: none;
+            /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-body {
+            background: #fff;
+            width: 500px;
+            /* Adjust as needed */
+            height: 700px;
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: fadeIn 0.5s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 20px;
+            cursor: pointer;
+            color: #333;
+            z-index: 1001;
+            /* Ensure above iframe */
+            background: #fff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        iframe {
+            width: 100%;
+            flex: 1;
+            border: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo"><span>mf</span> mobilefactory</div>
+        <div class="nav">
+            <a href="#">brochure ↓</a>
+            <a href="#">career</a>
+            <a href="#">contact</a>
+            <div class="menu-icon">☰</div>
+        </div>
+    </header>
+
+    <div class="hero">
+        <div class="hero-content">
+            <h1>도전과 자율,<br>집중</h1>
+            <p>
+                모바일팩토리는 도전과 자율,<br>
+                그리고 집중을 통해 혁신을 유도합니다.
+            </p>
+            <a href="#" class="btn-more" id="openEventBtn">자세히보기 →</a>
+        </div>
+    </div>
+
+    <!-- Popup Modal -->
+    <div class="modal-overlay" id="eventModal">
+        <div class="modal-body">
+            <div class="close-btn" id="closeModal">&times;</div>
+            <!-- Load existing event page -->
+            <iframe src="event.html"></iframe>
+            <div class="modal-footer"
+                style="padding: 10px; text-align: right; background: #f1f1f1; border-top: 1px solid #ddd;">
+                <label style="font-size: 0.9rem; color: #555; cursor: pointer;">
+                    <input type="checkbox" id="dontShowToday"> 오늘 하루 보지 않기
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('eventModal');
+        const openBtn = document.getElementById('openEventBtn');
+        const closeBtn = document.getElementById('closeModal');
+        const dontShowCheckbox = document.getElementById('dontShowToday');
+
+        // Check LocalStorage on load
+        window.addEventListener('load', () => {
+            const dontShowDate = localStorage.getItem('lottery_popup_closed_date');
+            const today = new Date().toISOString().split('T')[0];
+
+            if (dontShowDate !== today) {
+                modal.style.display = 'flex';
+            }
+        });
+
+        // Open on button click (Always open regardless of localStorage)
+        openBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            modal.style.display = 'flex';
+        });
+
+        // Close Modal
+        closeBtn.addEventListener('click', () => {
+            handleClose();
+        });
+
+        // Close on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                handleClose();
+            }
+        });
+
+        function handleClose() {
+            if (dontShowCheckbox.checked) {
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('lottery_popup_closed_date', today);
+            }
+            modal.style.display = 'none';
+        }
+    </script>
+
+</body>
+
+</html>
