@@ -40,10 +40,11 @@ CREATE TABLE TB_EVENT_WINNER (
     winner_id INT AUTO_INCREMENT PRIMARY KEY,
     event_id INT NOT NULL,
     participant_id INT NOT NULL,
-    winning_rank INT NOT NULL COMMENT '1=1st, 2=2nd, 3=3rd, 4=4th',
-    prize_name VARCHAR(100) NOT NULL COMMENT 'Prize Description',
-    win_dt DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Winning Determination Time',
-    
+    winning_rank INT NOT NULL,
+    prize_name VARCHAR(100) NOT NULL,
+    win_dt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    check_count INT DEFAULT 0,
+    last_check_dt DATETIME,
     FOREIGN KEY (event_id) REFERENCES TB_EVENT_MASTER(event_id),
     FOREIGN KEY (participant_id) REFERENCES TB_EVENT_PARTICIPANT(participant_id)
 );

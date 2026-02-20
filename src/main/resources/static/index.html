@@ -240,25 +240,66 @@
         </div>
     </div>
 
+
     <script>
         const modal = document.getElementById('eventModal');
         const openBtn = document.getElementById('openEventBtn');
         const closeBtn = document.getElementById('closeModal');
         const dontShowCheckbox = document.getElementById('dontShowToday');
+        const iframe = document.querySelector('iframe');
 
-        // Check LocalStorage on load
+
+        // Configuration
+        const ANNOUNCEMENT_DATE = '2026-04-01';
+
+        function getTodayString() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function isAnnouncementPeriod() {
+            return getTodayString() >= ANNOUNCEMENT_DATE;
+        }
+
+        // Check LocalStorage and Setup on load
         window.addEventListener('load', () => {
-            const dontShowDate = localStorage.getItem('lottery_popup_closed_date');
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayString();
+            const isResultPeriod = isAnnouncementPeriod();
 
-            if (dontShowDate !== today) {
-                modal.style.display = 'flex';
+            if (isResultPeriod) {
+                // 결과 발표 기간: result.html 로드
+                iframe.src = 'result.html';
+
+                // 매일 최초 1회 자동 오픈 (결과 확인 유도)
+                const lastCheck = localStorage.getItem('lastResultCheckPopupDate');
+                if (lastCheck !== today) {
+                    // confirm은 blocking이므로 약간의 지연 후 실행 권장하지만, 간단히 구현
+                    if (confirm("오늘의 당첨 결과를 확인하시겠습니까?")) {
+                        modal.style.display = 'flex';
+                        // 확인을 눌렀을 때 '오늘 확인 함' 처리
+                        localStorage.setItem('lastResultCheckPopupDate', today);
+                    }
+                }
+            } else {
+                // 이벤트 기간: event.html 로드
+                iframe.src = 'event.html';
+
+                // '오늘 하루 안 보기' 체크 여부에 따름
+                const closedDate = localStorage.getItem('lottery_popup_closed_date');
+                if (closedDate !== today) {
+                    modal.style.display = 'flex';
+                }
             }
         });
 
-        // Open on button click (Always open regardless of localStorage)
+        // Open on button click (Always open)
         openBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            // 버튼 클릭 시에도 기간에 맞는 페이지 로드 (이미 load에서 설정되었겠지만 안전장치)
+            if (isAnnouncementPeriod()) {
+                iframe.src = 'result.html';
+            } else {
+                iframe.src = 'event.html';
+            }
             modal.style.display = 'flex';
         });
 
@@ -275,11 +316,20 @@
         });
 
         function handleClose() {
+            const today = getTodayString();
+
             if (dontShowCheckbox.checked) {
-                const today = new Date().toISOString().split('T')[0];
-                localStorage.setItem('lottery_popup_closed_date', today);
+                if (isAnnouncementPeriod()) {
+                    // 결과 발표 기간에는 '오늘 하루 안 보기'가 '이미 확인했음'과 동일한 의미로 사용될 수 있음
+                    // 혹은 결과 기간에는 '오늘 하루 안 보기' 기능을 끌 수도 있음 (기획에 따라 다름)
+                    // 여기서는 결과 기간에도 동일하게 하루 안 보기를 적용
+                    localStorage.setItem('lastResultCheckPopupDate', today);
+                } else {
+                    localStorage.setItem('lottery_popup_closed_date', today);
+                }
             }
             modal.style.display = 'none';
+            dontShowCheckbox.checked = false; // Reset checkbox
         }
     </script>
 

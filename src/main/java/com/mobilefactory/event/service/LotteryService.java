@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -89,9 +90,23 @@ public class LotteryService {
 
         if (winnerOpt.isPresent()) {
             EventWinner winner = winnerOpt.get();
-            result.put("status", "win");
-            result.put("rank", winner.getWinningRank());
-            result.put("message", "축하합니다! " + winner.getPrizeName() + "에 당첨되셨습니다.");
+
+            // 확인 정보 업데이트
+            winner.setCheckCount(winner.getCheckCount() + 1);
+            winner.setLastCheckDt(LocalDateTime.now());
+            eventWinnerRepository.save(winner);
+
+            if (winner.getCheckCount() == 1) {
+                // 최초 확인: 상세 등수 공개
+                result.put("status", "win");
+                result.put("rank", winner.getWinningRank());
+                result.put("message", "축하합니다! " + winner.getPrizeName() + "에 당첨되셨습니다.");
+            } else {
+                // 두 번째 이후: 등수 숨김
+                result.put("status", "win");
+                result.put("rank", 0); // 등수 숨김 처리
+                result.put("message", "당첨되셨습니다! (상세 내역은 최초 확인 시에만 제공됩니다)");
+            }
         } else {
             // 추첨 진행 여부 확인
             // 참여 시점에 번호가 발급되므로, 당첨자 테이블에 없으면 대기 중이거나 낙첨입니다.

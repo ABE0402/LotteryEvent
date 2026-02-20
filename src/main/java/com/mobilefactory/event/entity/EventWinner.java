@@ -37,9 +37,18 @@ public class EventWinner {
     @Column(name = "win_dt")
     private LocalDateTime winDt;
 
+    @Column(name = "check_count")
+    private Integer checkCount;
+
+    @Column(name = "last_check_dt")
+    private LocalDateTime lastCheckDt;
+
     @PrePersist
     protected void onCreate() {
         winDt = LocalDateTime.now();
+        if (checkCount == null) {
+            checkCount = 0;
+        }
     }
 
 }
