@@ -22,30 +22,30 @@ public class LotteryService {
     private final EventWinnerRepository eventWinnerRepository;
     private final SmsService smsService;
 
-    // Hardcoded constraint for 1st place (Demo requirement)
+    // 1등 당첨을 위한 하드코딩된 제약조건 (1등 당첨 번호 조건)
     private static final String PRE_ASSIGNED_PHONE = "010-1234-5678";
 
     /**
-     * Participate in the event.
+     * 이벤트 참여
      */
     @Transactional
     public void participate(String name, String phone) {
-        // 1. Find Active Event
+        // 1. 진행 중인 이벤트 조회 (추후 홈페이지에 추가적인 이벤트가 생길 경우 사용될 부분)
         EventMaster event = eventMasterRepository.findByIsActiveTrue()
                 .orElseThrow(() -> new RuntimeException("진행 중인 이벤트가 없습니다."));
 
-        // 2. Check Duplicate
+        // 2. 중복 참여 확인
         if (eventParticipantRepository.findByPhoneAndEventId(phone, event.getEventId()).isPresent()) {
             throw new RuntimeException("이미 참여하신 전화번호입니다.");
         }
 
-        // 3. Get Entry Number (Audit purpose)
+        // 3. 응모 번호 조회 (감사 목적)
         int entryNo = eventParticipantRepository.countByEventId(event.getEventId()) + 1;
 
-        // 4. Generate Random Number for Participation
+        // 4. 참여를 위한 랜덤 번호 생성
         String lotteryNumber = generateRandomNumber();
 
-        // 5. Save Participant
+        // 5. 참여자 정보 저장
         EventParticipant participant = EventParticipant.builder()
                 .eventId(event.getEventId())
                 .name(name)
@@ -56,25 +56,23 @@ public class LotteryService {
 
         eventParticipantRepository.save(participant);
 
-        // 6. Send SMS
+        // 6. SMS 발송
         smsService.sendSms(phone, "[이벤트] 인증번호: " + lotteryNumber + " 입니다. 4월 1일 추첨 결과를 기대해주세요!");
     }
 
     /**
-     * Check Lottery Result.
+     * 당첨 결과 확인
      */
     public Map<String, Object> checkResult(String phone) {
         Map<String, Object> result = new HashMap<>();
 
-        // 1. Find Active or Latest Event
-        // For simplicity, we just pick the first active one or any event.
-        // In real world, we might need a specific event ID.
-        // If no active event, maybe looking for past events?
-        // Let's assume there is only one "Main" event for now.
+        // 1. 진행 중 또는 최근 이벤트 조회
+        // 편의상 활성화된 이벤트나 첫 번째 이벤트를 조회합니다.
+        // 실제 운영 환경에서는 특정 이벤트 ID가 필요할 수 있습니다.
         EventMaster event = eventMasterRepository.findAll().stream().findFirst()
                 .orElseThrow(() -> new RuntimeException("이벤트 정보가 없습니다."));
 
-        // 2. Check Participation
+        // 2. 참여 이력 확인
         Optional<EventParticipant> participantOpt = eventParticipantRepository.findByPhoneAndEventId(phone,
                 event.getEventId());
 
@@ -86,7 +84,7 @@ public class LotteryService {
 
         EventParticipant participant = participantOpt.get();
 
-        // 3. Check Winner
+        // 3. 당첨 여부 확인
         Optional<EventWinner> winnerOpt = eventWinnerRepository.findByParticipantId(participant.getParticipantId());
 
         if (winnerOpt.isPresent()) {
@@ -95,12 +93,9 @@ public class LotteryService {
             result.put("rank", winner.getWinningRank());
             result.put("message", "축하합니다! " + winner.getPrizeName() + "에 당첨되셨습니다.");
         } else {
-            // Check if draw has happened?
-            // If lotteryNumber is null, draw hasn't happened.
-            // But now we generate lotteryNumber on participate, so this logic needs update
-            // if we want to distinguish "before draw" vs "after draw, lost"
-            // For now, let's assume if not in Winner table, they are pending or lost.
-            // A simple way is to check if Event is still active.
+            // 추첨 진행 여부 확인
+            // 참여 시점에 번호가 발급되므로, 당첨자 테이블에 없으면 대기 중이거나 낙첨입니다.
+            // 여기서는 이벤트 활성 여부로 판단합니다.
             if (event.getIsActive()) {
                 result.put("status", "pending");
                 result.put("message", "추첨 전입니다. 부여된 번호: " + participant.getLotteryNumber());
@@ -113,7 +108,7 @@ public class LotteryService {
     }
 
     /**
-     * Draw Winners for the currently active event.
+     * 현재 진행 중인 이벤트에 대한 추첨 진행
      */
     @Transactional
     public void drawActiveEvent() {
@@ -123,21 +118,18 @@ public class LotteryService {
     }
 
     /**
-     * Draw Winners (Admin function)
-     * Using the logic from previous 'drawWinners' but applying to DB.
-     * NOTE: This logic RE-ASSIGNS lottery numbers to ensure winners.
-     * This means the number sent via SMS might CHANGE if the user wins (or loses in
-     * specific way).
-     * For a real lottery, we should pick winners based on their EXISTING numbers.
-     * But for this Demo/Assignment with "Rigged" requirement, we keep this
-     * overwrite logic.
+     * 추첨 진행 (관리자 기능)
+     * DB에 저장된 참여자를 대상으로 추첨을 진행합니다.
+     * 주의: 이 로직은 당첨자를 보장하기 위해 로또 번호를 '재할당(6자리)' 합니다.
+     * 즉, 참여 시점에 발송된 SMS 번호와 실제 추첨 번호가 달라질 수 있습니다 (당첨/낙첨 조작).
+     * 실제 로또라면 기존 번호를 기준으로 추첨해야 하지만, 과제 요구사항(특정 인원 당첨 보장)을 위해 덮어씁니다.
      */
     @Transactional
     public void drawWinners(Integer eventId) {
         EventMaster event = eventMasterRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("이벤트를 찾을 수 없습니다."));
 
-        // Load all participants
+        // 모든 참여자 조회
         List<EventParticipant> allEntries = eventParticipantRepository.findByEventId(eventId);
 
         if (allEntries.isEmpty())
@@ -146,20 +138,20 @@ public class LotteryService {
         Set<String> winningPhones = new HashSet<>();
         List<EventWinner> winners = new ArrayList<>();
 
-        // 1. Assign Random IDs (Shuffle)
+        // 1. 랜덤 ID 할당 (섞기)
         Collections.shuffle(allEntries);
-        // We can just use the index in the shuffled list as the "Random ID" logic
+        // 섞인 리스트의 인덱스를 랜덤 ID처럼 사용합니다.
 
-        // 2. Generate Grand Win Number
+        // 2. 1등 당첨 번호 생성
         String grandWinNum = generateRandomNumber();
         System.out.println("Winning Number: " + grandWinNum);
 
-        // 3. Selection Logic (Migrated)
+        // 3. 당첨자 선정 로직 (이관됨)
 
-        // --- Rank 1: Specific Phone ---
+        // --- 1등: 특정 전화번호 ---
         EventParticipant rank1 = findByPhone(allEntries, PRE_ASSIGNED_PHONE);
         if (rank1 == null && !allEntries.isEmpty()) {
-            rank1 = allEntries.get(0); // Fallback
+            rank1 = allEntries.get(0); // 대상자가 없으면 첫 번째 사람을 당첨시킴
         }
 
         if (rank1 != null) {
@@ -167,57 +159,60 @@ public class LotteryService {
             addWinner(winners, winningPhones, rank1, 1, "1등 상품");
         }
 
-        // Filter out winners for next ranks
-        List<EventParticipant> candidates = allEntries.stream()
-                .filter(e -> !winningPhones.contains(e.getPhone()))
+        // 다음 등수 추첨을 위해 당첨자 제외 (불필요해짐, 아래 스트림에서 필터링함)
+
+        // --- 2등: 5명 ---
+        // 조건: 기존 당첨자 제외 AND 참여번호 2000 ~ 7000번 사이
+        List<EventParticipant> rank2Winners = allEntries.stream()
+                .filter(p -> !winningPhones.contains(p.getPhone()))
+                .filter(p -> p.getEntryNo() >= 2000 && p.getEntryNo() <= 7000)
                 .collect(Collectors.toList());
 
-        // --- Rank 2: 5 People (Randomly picked from remaining) ---
-        // Original logic had "Random ID 2000~7000".
-        // Since we shuffled the list, we can just pick from the list.
-        // To strictly follow "Random ID" logic, we would assign an ID to each and
-        // filter.
-        // Let's simplify: just pick random N from candidates.
-        pickAndAssign(candidates, 5, grandWinNum, 2, "2등 상품", winners, winningPhones);
+        Collections.shuffle(rank2Winners);
+        rank2Winners.stream().limit(5).forEach(p -> {
+            assignWinningNumber(p, grandWinNum, 2);
+            addWinner(winners, winningPhones, p, 2, "2등 상품");
+        });
 
-        // --- Rank 3: 44 People ---
-        pickAndAssign(candidates, 44, grandWinNum, 3, "3등 상품", winners, winningPhones);
+        // --- 3등: 44명 ---
+        // 조건: 기존 당첨자 제외 AND 참여번호 1000 ~ 8000번 사이
+        List<EventParticipant> rank3Winners = allEntries.stream()
+                .filter(p -> !winningPhones.contains(p.getPhone()))
+                .filter(p -> p.getEntryNo() >= 1000 && p.getEntryNo() <= 8000)
+                .collect(Collectors.toList());
 
-        // --- Rank 4: 950 People ---
-        pickAndAssign(candidates, 950, grandWinNum, 4, "4등 상품", winners, winningPhones);
+        Collections.shuffle(rank3Winners);
+        rank3Winners.stream().limit(44).forEach(p -> {
+            assignWinningNumber(p, grandWinNum, 3);
+            addWinner(winners, winningPhones, p, 3, "3등 상품");
+        });
 
-        // 4. Losers
-        for (EventParticipant p : candidates) {
-            if (!winningPhones.contains(p.getPhone())) {
-                assignWinningNumber(p, grandWinNum, 0);
-            }
-        }
+        // --- 4등: 950명 ---
+        // 조건: 기존 당첨자 제외 (남은 사람 중 랜덤)
+        List<EventParticipant> rank4Valid = allEntries.stream()
+                .filter(p -> !winningPhones.contains(p.getPhone()))
+                .collect(Collectors.toList());
 
-        // 5. Save Changes
-        eventParticipantRepository.saveAll(allEntries); // Save assigned lottery numbers (Overwrites initial SMS number)
-        eventWinnerRepository.saveAll(winners); // Save winner records
+        Collections.shuffle(rank4Valid);
+        rank4Valid.stream().limit(950).forEach(p -> {
+            assignWinningNumber(p, grandWinNum, 4);
+            addWinner(winners, winningPhones, p, 4, "4등 상품");
+        });
 
-        // 6. Deactivate Event
+        // 4. 낙첨자 처리
+        // 4등 추첨 후 남은 인원 (rank4Valid에서 당첨된 사람 제외한 나머지)
+        // 위에서 rank4Valid를 셔플했으므로, 950명 이후의 사람들은 자동으로 낙첨
+        rank4Valid.stream().skip(950).forEach(p -> {
+            assignWinningNumber(p, grandWinNum, 0);
+        });
+
+        // 5. 변경사항 저장
+        eventParticipantRepository.saveAll(allEntries); // 할당된 로또 번호 저장 (참여 시점의 번호를 덮어씀)
+        eventWinnerRepository.saveAll(winners); // 당첨 내역 저장
+
+        // 6. 이벤트 종료 처리
         event.setIsActive(false);
         eventMasterRepository.save(event);
-    }
-
-    private void pickAndAssign(List<EventParticipant> candidates, int count, String grandWinNum, int rank, String prize,
-            List<EventWinner> winners, Set<String> winningPhones) {
-        // Filter candidates again (though reference is passed, we iterate and modify
-        // winningPhones)
-        List<EventParticipant> pool = candidates.stream()
-                .filter(e -> !winningPhones.contains(e.getPhone()))
-                .collect(Collectors.toList());
-
-        Collections.shuffle(pool);
-        int limit = Math.min(count, pool.size());
-
-        for (int i = 0; i < limit; i++) {
-            EventParticipant p = pool.get(i);
-            assignWinningNumber(p, grandWinNum, rank);
-            addWinner(winners, winningPhones, p, rank, prize);
-        }
     }
 
     private EventParticipant findByPhone(List<EventParticipant> list, String phone) {
@@ -271,7 +266,7 @@ public class LotteryService {
         Random rnd = new Random();
         boolean[] isMatch = new boolean[6];
 
-        // 1. Select indices to match
+        // 1. 일치시킬 인덱스 선택
         int matches = 0;
         while (matches < matchCount) {
             int idx = rnd.nextInt(6);
@@ -281,14 +276,14 @@ public class LotteryService {
             }
         }
 
-        // 2. Change non-matching indices
+        // 2. 불일치 인덱스 변경
         for (int i = 0; i < 6; i++) {
             if (!isMatch[i]) {
                 char original = result[i];
                 char changed;
                 do {
                     changed = (char) ('0' + rnd.nextInt(10));
-                } while (changed == original); // Ensure it's different from the target digit at this position
+                } while (changed == original); // 기존 숫자와 다른 숫자로 변경
                 result[i] = changed;
             }
         }
