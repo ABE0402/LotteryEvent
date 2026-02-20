@@ -32,7 +32,6 @@ spring.datasource.password=1234  <-- 비밀번호 확인
 실제 문자 발송은 API 비용 발생 및 계정 설정 등의 제약이 있어, **콘솔 로그를 통해 발송 내역을 확인**하는 방식으로 대체하였습니다.
 
 이벤트 참여 시, 서버 로그(Console)에 다음과 같은 형태로 출력됩니다:
-<img width="481" height="180" alt="image" src="https://github.com/user-attachments/assets/0a614ffb-f20c-4598-8553-2ed7bf7689f3" />
 
 ```
 ================ SMS SEND ================
