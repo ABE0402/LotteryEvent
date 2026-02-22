@@ -26,8 +26,76 @@ spring.datasource.password=1234  <-- 비밀번호 확인
 `LotteryEventApplication.java` 파일을 열고 녹색 `Run` 버튼을 클릭하세요.
 실행 후 브라우저에서 `http://localhost:8080/index.html`로 접속하면 이벤트 추첨 팝업 확인 가능.
 
+## 5. 데이터베이스 테이블 정의 및 주요 컬럼 설계
+이 프로젝트의 데이터베이스는 이벤트 관리, 참여자 추적, 당첨자 관리를 위한 3개의 주요 테이블로 구성되어 있습니다.
 
-## 5. SMS 발송 기능 (구현 참고사항)
+### 5.1. 이벤트 마스터 테이블 (`TB_EVENT_MASTER`)
+이벤트의 기본 정보와 기간을 관리하는 테이블입니다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+| :--- | :--- | :--- | :--- |
+| `event_id` | Integer | 이벤트 고식별자 | PK, 자동 증가 |
+| `event_name` | String | 이벤트 명칭 | 필수 |
+| `start_dt` | DateTime | 이벤트 시작 일시 | 필수 |
+| `end_dt` | DateTime | 이벤트 종료 일시 | 필수 |
+| `announce_dt` | DateTime | 당첨자 발표 일시 | 필수 |
+| `is_active` | Boolean | 이벤트 활성화 여부 | |
+| `created_at` | DateTime | 데이터 생성 일시 | |
+
+### 5.2. 이벤트 참여자 테이블 (`TB_EVENT_PARTICIPANT`)
+이벤트에 응모한 사용자의 정보를 저장하는 테이블입니다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+| :--- | :--- | :--- | :--- |
+| `participant_id` | Integer | 참여자 고유 식별자 | PK, 자동 증가 |
+| `event_id` | Integer | 관련 이벤트 ID | FK (`TB_EVENT_MASTER`) |
+| `phone` | String | 참여자 휴대폰 번호 | 필수 |
+| `name` | String | 참여자 이름 | |
+| `entry_no` | Integer | 참여 순번/응모 번호 | 필수 |
+| `ip_address` | String | 참여 당시 IP 주소 | |
+| `reg_dt` | DateTime | 참여 등록 일시 | |
+| `lottery_number` | String | 할당된 추첨 번호 | |
+
+### 5.3. 이벤트 당첨자 테이블 (`TB_EVENT_WINNER`)
+이벤트 추첨을 통해 선정된 당첨자 정보를 관리하는 테이블입니다.
+
+| 컬럼명 | 타입 | 설명 | 비고 |
+| :--- | :--- | :--- | :--- |
+| `winner_id` | Integer | 당첨 고유 식별자 | PK, 자동 증가 |
+| `event_id` | Integer | 관련 이벤트 ID | FK (`TB_EVENT_MASTER`) |
+| `participant_id` | Integer | 참여자 식별 ID | FK (`TB_EVENT_PARTICIPANT`) |
+| `winning_rank` | Integer | 당첨 등수 | 필수 |
+| `prize_name` | String | 경품 명칭 | 필수 |
+| `win_dt` | DateTime | 당첨 처리 일시 | |
+| `check_count` | Integer | 당첨 결과 확인 횟수 | 기본값: 0 |
+| `last_check_dt` | DateTime | 최종 결과 확인 일시 | |
+
+#### 핵심 설계 관계도
+- **1개**의 이벤트(`TB_EVENT_MASTER`)는 **여러 명**의 참여자(`TB_EVENT_PARTICIPANT`)를 가질 수 있습니다.
+- **1개**의 이벤트(`TB_EVENT_MASTER`)는 **여러 명**의 당첨자(`TB_EVENT_WINNER`)를 배출합니다.
+- **당첨자**(`TB_EVENT_WINNER`)는 반드시 **참여자**(`TB_EVENT_PARTICIPANT`) 테이블의 데이터를 참조해야 합니다. (당첨자는 참여자 중에서만 발생)
+
+### 5.4. 인덱스(Index) 전략
+데이터 조회 성능 향상을 위해 다음과 같은 인덱스를 설계하였습니다.
+
+```sql
+-- TB_EVENT_MASTER: 진행 중인 이벤트를 빠르게 찾기 위함
+CREATE INDEX idx_master_active ON TB_EVENT_MASTER(is_active);
+
+-- TB_EVENT_PARTICIPANT: 전체 참여 이력 조회 및 중복 체크 성능 향상
+CREATE INDEX idx_part_phone ON TB_EVENT_PARTICIPANT(phone);
+
+-- TB_EVENT_WINNER: 당첨자 조회 및 조인(Join) 성능 최적화
+CREATE INDEX idx_winner_event ON TB_EVENT_WINNER(event_id);
+CREATE INDEX idx_winner_part ON TB_EVENT_WINNER(participant_id);
+```
+
+#### 설무 상세
+- **TB_EVENT_MASTER (is_active)**: `findByIsActiveTrue` 등의 쿼리에서 활성 이벤트를 즉시 조회하기 위해 사용합니다.
+- **TB_EVENT_PARTICIPANT (phone)**: `(event_id, phone)` 복합 유니크 키가 있어 특정 이벤트 내 조회는 빠르지만, 전체 참여 이력 조회를 위해 단독 인덱스를 추가하였습니다.
+- **TB_EVENT_WINNER (event_id, participant_id)**: 외래키(FK) 컬럼에 인덱스를 추가하여 조인 성능을 최적화하고 데이터 무결성 체크 속도를 높였습니다.
+
+## 6. SMS 발송 기능 (구현 참고사항)
 본 과제에서는 실제 SMS API(coolsms, twilio 등)를 연동하지 않고 **Mock(모의) SMS 서비스**를 구현하였습니다.
 실제 문자 발송은 API 비용 발생 및 계정 설정 등의 제약이 있어, **콘솔 로그를 통해 발송 내역을 확인**하는 방식으로 대체하였습니다.
 
@@ -40,7 +108,7 @@ Content: [이벤트] 인증번호: 123456 입니다. 4월 1일 추첨 결과를 
 ==========================================
 ```
 
-## 6. 당첨자 선정 로직 및 필터링 전략 (구현 설명)
+## 7. 당첨자 선정 로직 및 필터링 전략 (구현 설명)
 
 ### 1. 당첨 번호 조건 및 필터링 방식 비교
 본 프로젝트에서는 당첨자 선정 시 **AND 연산자(`&&`)를 활용한 범위 필터링 방식**을 채택하였습니다.
@@ -61,7 +129,7 @@ Content: [이벤트] 인증번호: 123456 입니다. 4월 1일 추첨 결과를 
   .filter(p -> p.getEntryNo() >= 2000 && p.getEntryNo() <= 7000)
   ```
 
-- **선택 이유 (Why AND Filtering?)**:
+- **선택 이유**:
   1.  **명확한 로직 표현**: "A 조건 `그리고` B 조건"이라는 요구사항이 코드에 직관적으로 드러남.
   2.  **유연한 확장성**: 추후 "서울 거주자(`AND Region == Seoul`)" 같은 조건이 추가되어도 `filter` 한 줄만 추가하면 됨.
   3.  **요구사항 정밀 반영**: 과제에서 요구하는 특정 범위(Range) 내 당첨자 선정을 정확하게 구현 가능.
@@ -75,7 +143,7 @@ Content: [이벤트] 인증번호: 123456 입니다. 4월 1일 추첨 결과를 
 - **문제점**: `eventParticipantRepository.findByEventId`로 모든 참여자 정보를 `List` 객체로 한 번에 메모리에 로딩합니다. 수십만 명 이상의 데이터가 힙(Heap) 메모리에 올라갈 경우, 서버가 감당하지 못할 수 있습니다.
 - **개선 방안**:
     - **Spring Batch**를 도입하여 대용량 데이터를 청크(Chunk) 단위로 나누어 처리
-    - 애플리케이션 메모리 로딩 대신 **DB 쿼리 레벨(ORDER BY RAND() LIMIT N)**에서 랜덤 추출
+    - 애플리케이션 메모리 로딩 대신 DB 쿼리 레벨(ORDER BY RAND() LIMIT N)에서 랜덤 추출
 
 #### B. 동시성 문제 (Concurrency & Race Condition)
 - **문제점**: 관리자가 실수로 추첨 버튼을 동시에 누르거나, 분산 서버 환경에서 동시에 실행될 경우, 같은 참여자가 중복 당첨되거나 추첨 결과가 덮어씌워질 위험이 있습니다. (`@Transactional`만으로는 완벽한 동시성 제어가 어려울 수 있음)
@@ -91,7 +159,7 @@ Content: [이벤트] 인증번호: 123456 입니다. 4월 1일 추첨 결과를 
 
 ---
 
-## 7. 결과 발표 기능 검증 가이드
+## 8. 결과 발표 기능 검증 가이드
 
 구현된 기능들이 정상적으로 동작하는지 확인하기 위한 수동 검증 단계입니다.
 
